@@ -18,7 +18,7 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
 
   const questions = createMemo(() => props.request.questions)
   const single = createMemo(() => questions().length === 1 && questions()[0]?.multiple !== true)
-  const tabs = createMemo(() => (single() ? 1 : questions().length + 2)) // questions + comments tab + confirm tab (no extra tabs for single select)
+  const tabs = createMemo(() => (single() ? 1 : questions().length + 2)) // questions + comments tab + confirm tab (no comments or confirm for single select)
   const [store, setStore] = createStore({
     tab: 0,
     answers: [] as QuestionAnswer[],
