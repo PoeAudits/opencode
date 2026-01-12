@@ -1859,6 +1859,12 @@ function Question(props: ToolProps<typeof QuestionTool>) {
                 </box>
               )}
             </For>
+            <Show when={props.metadata.comment}>
+              <box flexDirection="row" gap={1}>
+                <text fg={theme.textMuted}>Additional context:</text>
+                <text fg={theme.text}>{props.metadata.comment}</text>
+              </box>
+            </Show>
           </box>
         </BlockTool>
       </Match>

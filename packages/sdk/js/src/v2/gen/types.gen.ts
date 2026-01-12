@@ -573,6 +573,7 @@ export type EventQuestionReplied = {
     sessionID: string
     requestID: string
     answers: Array<QuestionAnswer>
+    comment?: string
   }
 }
 
@@ -3641,6 +3642,10 @@ export type QuestionReplyData = {
      * User answers in order of questions (each answer is an array of selected labels)
      */
     answers: Array<QuestionAnswer>
+    /**
+     * Optional additional context from the user
+     */
+    comment?: string
   }
   path: {
     requestID: string

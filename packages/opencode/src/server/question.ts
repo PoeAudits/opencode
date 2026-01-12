@@ -59,6 +59,7 @@ export const QuestionRoute = new Hono()
       await Question.reply({
         requestID: params.requestID,
         answers: json.answers,
+        comment: json.comment,
       })
       return c.json(true)
     },

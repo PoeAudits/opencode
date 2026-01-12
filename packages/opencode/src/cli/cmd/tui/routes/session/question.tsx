@@ -18,19 +18,21 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
 
   const questions = createMemo(() => props.request.questions)
   const single = createMemo(() => questions().length === 1 && questions()[0]?.multiple !== true)
-  const tabs = createMemo(() => (single() ? 1 : questions().length + 1)) // questions + confirm tab (no confirm for single select)
+  const tabs = createMemo(() => (single() ? 1 : questions().length + 2)) // questions + comments tab + confirm tab (no extra tabs for single select)
   const [store, setStore] = createStore({
     tab: 0,
     answers: [] as QuestionAnswer[],
     custom: [] as string[],
     selected: 0,
     editing: false,
+    comment: "",
   })
 
   let textarea: TextareaRenderable | undefined
 
   const question = createMemo(() => questions()[store.tab])
-  const confirm = createMemo(() => !single() && store.tab === questions().length)
+  const comments = createMemo(() => !single() && store.tab === questions().length)
+  const confirm = createMemo(() => !single() && store.tab === questions().length + 1)
   const options = createMemo(() => question()?.options ?? [])
   const other = createMemo(() => store.selected === options().length)
   const input = createMemo(() => store.custom[store.tab] ?? "")
@@ -46,6 +48,7 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
     sdk.client.question.reply({
       requestID: props.request.id,
       answers,
+      comment: store.comment || undefined,
     })
   }
 
@@ -121,7 +124,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
   const dialog = useDialog()
 
   useKeyboard((evt) => {
-    // When editing "Other" textarea
     if (store.editing && !confirm()) {
       if (evt.name === "escape") {
         evt.preventDefault()
@@ -131,6 +133,14 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
       if (evt.name === "return") {
         evt.preventDefault()
         const text = textarea?.plainText?.trim() ?? ""
+
+        if (comments()) {
+          setStore("comment", text)
+          setStore("editing", false)
+          setStore("tab", store.tab + 1)
+          return
+        }
+
         const prev = store.custom[store.tab]
 
         if (!text) {
@@ -198,6 +208,15 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
         evt.preventDefault()
         reject()
       }
+    } else if (comments()) {
+      if (evt.name === "return") {
+        evt.preventDefault()
+        setStore("editing", true)
+      }
+      if (evt.name === "escape" || keybind.match("app_exit", evt)) {
+        evt.preventDefault()
+        reject()
+      }
     } else {
       const opts = options()
       const total = opts.length + 1 // options + "Other"
@@ -257,15 +276,25 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
             <box
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={confirm() ? theme.accent : theme.backgroundElement}
+              backgroundColor={comments() ? theme.accent : theme.backgroundElement}
               onMouseUp={() => selectTab(questions().length)}
+            >
+              <text fg={comments() ? theme.selectedListItemText : store.comment ? theme.text : theme.textMuted}>
+                Comments
+              </text>
+            </box>
+            <box
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={confirm() ? theme.accent : theme.backgroundElement}
+              onMouseUp={() => selectTab(questions().length + 1)}
             >
               <text fg={confirm() ? theme.selectedListItemText : theme.textMuted}>Confirm</text>
             </box>
           </box>
         </Show>
 
-        <Show when={!confirm()}>
+        <Show when={!confirm() && !comments()}>
           <box paddingLeft={1} gap={1}>
             <box>
               <text fg={theme.text}>
@@ -328,6 +357,40 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
           </box>
         </Show>
 
+        <Show when={comments()}>
+          <box paddingLeft={1} gap={1}>
+            <box>
+              <text fg={theme.text}>Add any additional context or instructions</text>
+            </box>
+            <box>
+              <box onMouseUp={() => setStore("editing", true)}>
+                <box backgroundColor={theme.backgroundElement}>
+                  <text fg={theme.secondary}>1. Type your own answer</text>
+                </box>
+                <Show when={store.editing}>
+                  <box paddingLeft={3}>
+                    <textarea
+                      ref={(val: TextareaRenderable) => (textarea = val)}
+                      focused
+                      initialValue={store.comment}
+                      placeholder="Type your own answer"
+                      textColor={theme.text}
+                      focusedTextColor={theme.text}
+                      cursorColor={theme.primary}
+                      keyBindings={bindings()}
+                    />
+                  </box>
+                </Show>
+                <Show when={!store.editing && store.comment}>
+                  <box paddingLeft={3}>
+                    <text fg={theme.textMuted}>{store.comment}</text>
+                  </box>
+                </Show>
+              </box>
+            </box>
+          </box>
+        </Show>
+
         <Show when={confirm() && !single()}>
           <box paddingLeft={1}>
             <text fg={theme.text}>Review</text>
@@ -344,6 +407,12 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
               )
             }}
           </For>
+          <Show when={store.comment}>
+            <box flexDirection="row" gap={1} paddingLeft={1}>
+              <text fg={theme.textMuted}>Comments:</text>
+              <text fg={theme.text}>{store.comment}</text>
+            </box>
+          </Show>
         </Show>
       </box>
       <box
@@ -361,7 +430,7 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
               {"⇆"} <span style={{ fg: theme.textMuted }}>tab</span>
             </text>
           </Show>
-          <Show when={!confirm()}>
+          <Show when={!confirm() && !comments()}>
             <text fg={theme.text}>
               {"↑↓"} <span style={{ fg: theme.textMuted }}>select</span>
             </text>
@@ -369,7 +438,7 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
           <text fg={theme.text}>
             enter{" "}
             <span style={{ fg: theme.textMuted }}>
-              {confirm() ? "submit" : multi() ? "toggle" : single() ? "submit" : "confirm"}
+              {confirm() ? "submit" : comments() ? "edit" : multi() ? "toggle" : single() ? "submit" : "confirm"}
             </span>
           </text>
 

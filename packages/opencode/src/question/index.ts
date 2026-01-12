@@ -56,6 +56,7 @@ export namespace Question {
     answers: z
       .array(Answer)
       .describe("User answers in order of questions (each answer is an array of selected labels)"),
+    comment: z.string().optional().describe("Optional additional context from the user"),
   })
   export type Reply = z.infer<typeof Reply>
 
@@ -67,6 +68,7 @@ export namespace Question {
         sessionID: z.string(),
         requestID: z.string(),
         answers: z.array(Answer),
+        comment: z.string().optional(),
       }),
     ),
     Rejected: BusEvent.define(
@@ -83,7 +85,7 @@ export namespace Question {
       string,
       {
         info: Request
-        resolve: (answers: Answer[]) => void
+        resolve: (answers: Answer[], comment?: string) => void
         reject: (e: any) => void
       }
     > = {}
@@ -97,13 +99,13 @@ export namespace Question {
     sessionID: string
     questions: Info[]
     tool?: { messageID: string; callID: string }
-  }): Promise<Answer[]> {
+  }): Promise<{ answers: Answer[]; comment?: string }> {
     const s = await state()
     const id = Identifier.ascending("question")
 
     log.info("asking", { id, questions: input.questions.length })
 
-    return new Promise<Answer[]>((resolve, reject) => {
+    return new Promise<{ answers: Answer[]; comment?: string }>((resolve, reject) => {
       const info: Request = {
         id,
         sessionID: input.sessionID,
@@ -112,14 +114,14 @@ export namespace Question {
       }
       s.pending[id] = {
         info,
-        resolve,
+        resolve: (answers, comment) => resolve({ answers, comment }),
         reject,
       }
       Bus.publish(Event.Asked, info)
     })
   }
 
-  export async function reply(input: { requestID: string; answers: Answer[] }): Promise<void> {
+  export async function reply(input: { requestID: string; answers: Answer[]; comment?: string }): Promise<void> {
     const s = await state()
     const existing = s.pending[input.requestID]
     if (!existing) {
@@ -134,9 +136,10 @@ export namespace Question {
       sessionID: existing.info.sessionID,
       requestID: existing.info.id,
       answers: input.answers,
+      comment: input.comment,
     })
 
-    existing.resolve(input.answers)
+    existing.resolve(input.answers, input.comment)
   }
 
   export async function reject(requestID: string): Promise<void> {
